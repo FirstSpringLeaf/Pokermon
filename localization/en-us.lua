@@ -2366,6 +2366,15 @@ return {
                     "of that card's total chips",
                 } 
             },
+            j_poke_jirachi = {
+                name = 'Jirachi',
+                text = {
+                    "Permanently gain +1 resource at end of round",
+                    "{C:inactive}Your wishes might come true",
+                    "Destroy this joker after triggering 7 times",
+                    "{C:inactive}(Currently triggered {C:attention}#1#{}{C:inactive}/7 times)",
+                }
+            },
             j_poke_buizel = {
                 name = 'Buizel',
                 text = {
