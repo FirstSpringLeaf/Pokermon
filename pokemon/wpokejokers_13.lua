@@ -227,11 +227,119 @@ local metagross={
 -- Groudon 383
 -- Rayquaza 384
 -- Jirachi 385
+local jirachi = {
+  name = "jirachi",
+  pos = {x = 4, y = 14},
+  soul_pos = { x = 5, y = 14},
+  config = {extra = {triggers = 0}},
+  loc_vars = function(self, info_queue, center)
+    type_tooltip(self, info_queue, center)
+    return {vars = {center.ability.extra.triggers}}
+  end,
+  rarity = 4,
+  cost = 20,
+  stage = "Legendary",
+  ptype = "Metal",
+  atlas = "Pokedex3",
+  blueprint_compat = false,
+  calculate = function(self, card, context)
+    if context.end_of_round
+       and not context.individual
+       and not context.repetition
+       and not context.blueprint
+    then
+      if card.ability.extra.triggers < 7 then
+        local resources = {"money", "hand", "discard", "joker", "consumable", "hand_size"}
+        local weights   = {1,1,1,1,1,1}
+        if G.GAME.current_round.hands_left
+           and G.GAME.current_round.hands_left <= 0
+        then
+          weights[2] = weights[2] + 1
+        end
+        if G.GAME.current_round.discards_left
+           and G.GAME.current_round.discards_left <= 0
+        then
+          weights[3] = weights[3] + 1
+        end
+        if G.jokers
+           and G.jokers.config.card_limit <= #G.jokers.cards
+        then
+          weights[4] = weights[4] + 1
+        end
+        if #G.consumeables.cards + G.GAME.consumeable_buffer
+           >= G.consumeables.config.card_limit
+        then
+          weights[5] = weights[5] + 1
+        end
+        if (SMODS.Mods["Talisman"] or {}).can_load then
+          if to_big(G.GAME.dollars) < to_big(20) then
+            weights[1] = weights[1] + 1
+          end
+        else
+          if G.GAME.dollars < 20 then
+            weights[1] = weights[1] + 1
+          end
+        end
+        local sum = 0
+        for _, w in ipairs(weights) do
+          sum = sum + w
+        end
+        local roll = pseudorandom('jirachi'..pseudoseed('round'..G.GAME.round_resets.ante)) * sum
+        roll = math.floor(roll) + 1
+        local choice
+        local accum = 0
+        for i, w in ipairs(weights) do
+          accum = accum + w
+          if roll <= accum then
+            choice = resources[i]
+            break
+          end
+        end
+        local msg = nil
+        if choice == "money" then
+          G.GAME.dollars = G.GAME.dollars + 1
+          msg = "+1 dollar"
+        elseif choice == "hand" then
+          G.GAME.round_resets.hands = G.GAME.round_resets.hands + 1
+          ease_hands_played(1)
+          msg = "+1 hand"
+        elseif choice == "discard" then
+          G.GAME.round_resets.discards = G.GAME.round_resets.discards + 1
+          ease_discard(1)
+          msg = "+1 discard"
+        elseif choice == "joker" then
+          G.jokers.config.card_limit = G.jokers.config.card_limit + 1
+          msg = "+1 joker slot"
+        elseif choice == "consumable" then
+          G.consumeables.config.card_limit = G.consumeables.config.card_limit + 1
+          msg = "+1 consumable slot"
+        elseif choice == "hand_size" then
+          G.hand:change_size(1)
+          msg = "+1 hand size"
+        end
+        if msg then
+          card_eval_status_text(
+            card, 'extra', nil, nil, nil,
+            {message = ""..msg.."!"}
+          )
+        end
+        card.ability.extra.triggers = card.ability.extra.triggers + 1
+        if card.ability.extra.triggers >= 7 then
+          card_eval_status_text(
+            card, 'extra', nil, nil, nil,
+            {message = "Jirachi has granted all its wishes!"}
+          )
+          card.REMOVED = true
+        end
+      end
+    end
+  end
+}
 -- Deoxys 386
 -- Turtwig 387
 -- Grotle 388
 -- Torterra 389
 -- Chimchar 390
 return {name = "Pokemon Jokers 361-390", 
-        list = {snorunt, glalie, beldum, metang, metagross},
+        list = {snorunt, glalie, beldum, metang, metagross, jirachi},
 }
