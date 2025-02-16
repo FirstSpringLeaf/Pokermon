@@ -248,88 +248,112 @@ local jirachi = {
        and not context.repetition
        and not context.blueprint
     then
+      if not card.ability.extra.resource_data then
+        card.ability.extra.resource_data = {
+          money       = 0,
+          hand        = 0,
+          discard     = 0,
+          joker       = 0,
+          consumable  = 0,
+          hand_size   = 0,
+        }
+      end
       if card.ability.extra.triggers < 7 then
-        local resources = {"money", "hand", "discard", "joker", "consumable", "hand_size"}
-        local weights   = {1,1,1,1,1,1}
-        if G.GAME.current_round.hands_left
-           and G.GAME.current_round.hands_left <= 0
-        then
-          weights[2] = weights[2] + 1
+        local resource_keys = {"money", "hand", "discard", "joker", "consumable", "hand_size"}
+        local function get_base_weight(r)
+          local triggered_count = card.ability.extra.resource_data[r] or 0
+          local base = 3 - triggered_count
+          if base < 0 then base = 0 end
+          return base
         end
-        if G.GAME.current_round.discards_left
-           and G.GAME.current_round.discards_left <= 0
-        then
-          weights[3] = weights[3] + 1
+        local weights = {}
+        for _, r in ipairs(resource_keys) do
+          weights[r] = get_base_weight(r)
         end
-        if G.jokers
-           and G.jokers.config.card_limit <= #G.jokers.cards
-        then
-          weights[4] = weights[4] + 1
-        end
-        if #G.consumeables.cards + G.GAME.consumeable_buffer
-           >= G.consumeables.config.card_limit
-        then
-          weights[5] = weights[5] + 1
-        end
+        local hands_left = G.GAME.current_round.hands_left or 0
+        local discards_left = G.GAME.current_round.discards_left or 0
+        local jokers_full = (G.jokers and G.jokers.config.card_limit <= #G.jokers.cards)
+        local consumable_limit = (#G.consumeables.cards + G.GAME.consumeable_buffer) >= G.consumeables.config.card_limit
+        local low_money = false
         if (SMODS.Mods["Talisman"] or {}).can_load then
           if to_big(G.GAME.dollars) < to_big(20) then
-            weights[1] = weights[1] + 1
+            low_money = true
           end
         else
-          if G.GAME.dollars < 20 then
-            weights[1] = weights[1] + 1
+          if G.GAME.dollars < 30 then
+            low_money = true
           end
+        end
+        if hands_left <= 0 and weights["hand"] > 0 then
+          weights["hand"] = weights["hand"] * 2
+        end
+        if discards_left <= 0 and weights["discard"] > 0 then
+          weights["discard"] = weights["discard"] * 2
+        end
+        if jokers_full and weights["joker"] > 0 then
+          weights["joker"] = weights["joker"] * 2
+        end
+        if consumable_limit and weights["consumable"] > 0 then
+          weights["consumable"] = weights["consumable"] * 2
+        end
+        if low_money and weights["money"] > 0 then
+          weights["money"] = weights["money"] * 2
         end
         local sum = 0
-        for _, w in ipairs(weights) do
-          sum = sum + w
+        for _, r in ipairs(resource_keys) do
+          sum = sum + weights[r]
         end
-        local roll = pseudorandom('jirachi'..pseudoseed('round'..G.GAME.round_resets.ante)) * sum
-        roll = math.floor(roll) + 1
-        local choice
-        local accum = 0
-        for i, w in ipairs(weights) do
-          accum = accum + w
-          if roll <= accum then
-            choice = resources[i]
-            break
+        if sum > 0 then
+          local roll = pseudorandom('jirachi'..pseudoseed('round'..G.GAME.round_resets.ante)) * sum
+          roll = math.floor(roll) + 1
+          local choice = nil
+          local accum = 0
+          for _, r in ipairs(resource_keys) do
+            accum = accum + weights[r]
+            if roll <= accum then
+              choice = r
+              break
+            end
           end
-        end
-        local msg = nil
-        if choice == "money" then
-          G.GAME.dollars = G.GAME.dollars + 1
-          msg = "+1 dollar"
-        elseif choice == "hand" then
-          G.GAME.round_resets.hands = G.GAME.round_resets.hands + 1
-          ease_hands_played(1)
-          msg = "+1 hand"
-        elseif choice == "discard" then
-          G.GAME.round_resets.discards = G.GAME.round_resets.discards + 1
-          ease_discard(1)
-          msg = "+1 discard"
-        elseif choice == "joker" then
-          G.jokers.config.card_limit = G.jokers.config.card_limit + 1
-          msg = "+1 joker slot"
-        elseif choice == "consumable" then
-          G.consumeables.config.card_limit = G.consumeables.config.card_limit + 1
-          msg = "+1 consumable slot"
-        elseif choice == "hand_size" then
-          G.hand:change_size(1)
-          msg = "+1 hand size"
-        end
-        if msg then
-          card_eval_status_text(
-            card, 'extra', nil, nil, nil,
-            {message = ""..msg.."!"}
-          )
-        end
-        card.ability.extra.triggers = card.ability.extra.triggers + 1
-        if card.ability.extra.triggers >= 7 then
-          card_eval_status_text(
-            card, 'extra', nil, nil, nil,
-            {message = "Jirachi has granted all its wishes!"}
-          )
-          card.REMOVED = true
+          if choice then
+            local msg = nil
+            if choice == "money" then
+              G.GAME.dollars = G.GAME.dollars + 1
+              msg = "+1 dollar"
+            elseif choice == "hand" then
+              G.GAME.round_resets.hands = G.GAME.round_resets.hands + 1
+              ease_hands_played(1)
+              msg = "+1 hand"
+            elseif choice == "discard" then
+              G.GAME.round_resets.discards = G.GAME.round_resets.discards + 1
+              ease_discard(1)
+              msg = "+1 discard"
+            elseif choice == "joker" then
+              G.jokers.config.card_limit = G.jokers.config.card_limit + 1
+              msg = "+1 joker slot"
+            elseif choice == "consumable" then
+              G.consumeables.config.card_limit = G.consumeables.config.card_limit + 1
+              msg = "+1 consumable slot"
+            elseif choice == "hand_size" then
+              G.hand:change_size(1)
+              msg = "+1 hand size"
+            end
+            if msg then
+              card_eval_status_text(
+                card, 'extra', nil, nil, nil,
+                {message = msg.."!"}
+              )
+            end
+            card.ability.extra.triggers = card.ability.extra.triggers + 1
+            card.ability.extra.resource_data[choice] = card.ability.extra.resource_data[choice] + 1
+            if card.ability.extra.triggers >= 7 then
+              remove(self, card, context)
+              card_eval_status_text(
+                card, 'extra', nil, nil, nil,
+                {message = "Jirachi has granted all its wishes!"}
+              )
+            end
+          end
         end
       end
     end
