@@ -2369,10 +2369,8 @@ return {
             j_poke_jirachi = {
                 name = 'Jirachi',
                 text = {
-                    "Permanently gain +1 resource at end of round",
-                    "{C:inactive}Your wishes might come true",
-                    "Destroy this joker after triggering 7 times",
-                    "{C:inactive}(Currently triggered {C:attention}#1#{}{C:inactive}/7 times)",
+                    "{C:dark_edition}Your wishes might come true!",
+                    "{C:inactive,s:0.8}({C:attention,s:0.8}#1#{}{C:inactive,s:0.8}/7 wishes granted)",
                 }
             },
             j_poke_buizel = {
